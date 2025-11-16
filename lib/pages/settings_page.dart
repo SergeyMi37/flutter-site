@@ -19,6 +19,8 @@ class _SettingsPageState extends State<SettingsPage> {
   late TextEditingController _geolocationUrlController;
   late TextEditingController _urlBaseController;
   late TextEditingController _intervalController;
+  late TextEditingController _usernameController;
+  late TextEditingController _passwordController;
 
   @override
   void initState() {
@@ -33,6 +35,12 @@ class _SettingsPageState extends State<SettingsPage> {
     _intervalController = TextEditingController(
       text: (settingsStorage.get('geolocation_interval') ?? 60).toString(),
     );
+    _usernameController = TextEditingController(
+      text: settingsStorage.get('username') ?? '',
+    );
+    _passwordController = TextEditingController(
+      text: settingsStorage.get('password') ?? '',
+    );
 
     // Глобальная отправка управляется из MyApp, локальная не нужна
   }
@@ -42,6 +50,8 @@ class _SettingsPageState extends State<SettingsPage> {
     _geolocationUrlController.dispose();
     _urlBaseController.dispose();
     _intervalController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
     _testTimer?.cancel();
     super.dispose();
   }
@@ -171,17 +181,79 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 16),
 
-            // UrlBase
+            // Выбор предустановленного сайта
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'Выберите сайт',
+              ),
+              value: _getSelectedPreset(),
+              items: _getPresetSites(),
+              onChanged: (value) {
+                if (value != null) {
+                  _setPresetSite(value);
+                }
+              },
+            ),
+
+            const SizedBox(height: 8),
+
+            // Пользовательский URL
             TextFormField(
               controller: _urlBaseController,
               decoration: const InputDecoration(
-                labelText: 'UrlBase',
+                labelText: 'Или введите свой URL',
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            const Text(
+              'Можно выбрать предустановленный сайт или ввести свой',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+                fontStyle: FontStyle.italic,
               ),
             ),
 
             const SizedBox(height: 24),
 
+            const Text(
+              'Авторизация для сайта',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+
+            // Логин для сайта
+            TextFormField(
+              controller: _usernameController,
+              decoration: const InputDecoration(
+                labelText: 'Логин (username)',
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // Пароль для сайта
+            TextFormField(
+              controller: _passwordController,
+              decoration: const InputDecoration(
+                labelText: 'Пароль (password)',
+              ),
+              obscureText: true,
+            ),
+
+            const Text(
+              'Эти данные будут использоваться для автоматической авторизации при загрузке сайта',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+
             const SizedBox(height: 24),
+
             const Text(
               'Тестирование геолокации',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -225,6 +297,8 @@ class _SettingsPageState extends State<SettingsPage> {
     settingsStorage.updateSettings({
       'geolocation_url': _geolocationUrlController.text,
       'url_base': _urlBaseController.text,
+      'username': _usernameController.text,
+      'password': _passwordController.text,
       'geolocation_interval': int.tryParse(_intervalController.text) ?? 60,
     });
 
@@ -235,9 +309,53 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  String? _getSelectedPreset() {
+    final presetSites = _getPresetSitesMap();
+    final currentUrl = _urlBaseController.text;
+    
+    for (final entry in presetSites.entries) {
+      if (currentUrl == entry.value) {
+        return entry.key;
+      }
+    }
+    return null;
+  }
+
+  List<DropdownMenuItem<String>> _getPresetSites() {
+    final presetSites = _getPresetSitesMap();
+    
+    return [
+      const DropdownMenuItem(value: "", child: Text("Свой URL")),
+      ...presetSites.entries.map((entry) =>
+        DropdownMenuItem(
+          value: entry.key,
+          child: Text(entry.key),
+        )
+      ),
+    ];
+  }
+
+  Map<String, String> _getPresetSitesMap() {
+    final settingsStorage = Provider.of<SettingsStorage>(context, listen: false);
+    final presetSites = settingsStorage.getPresetSites();
+    
+    Map<String, String> sitesMap = {};
+    for (var site in presetSites) {
+      sitesMap[site['name']!] = site['url']!;
+    }
+    return sitesMap;
+  }
+
+  void _setPresetSite(String presetKey) {
+    final presetSites = _getPresetSitesMap();
+    if (presetSites.containsKey(presetKey)) {
+      _urlBaseController.text = presetSites[presetKey]!;
+    }
+  }
   void _goBack() {
     Navigator.of(context).pop();
   }
+
 
   // Эти методы больше не нужны, так как отправка управляется глобально
 
